@@ -1,0 +1,309 @@
+openapi: 3.0.3
+info:
+  title: Mini Store API
+  description: REST API for fullstack e-commerce take-home project
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3001
+    description: Development server
+
+tags:
+  - name: Products
+    description: Product catalog operations
+  - name: Orders
+    description: Order management operations
+  - name: Health
+    description: Health check endpoint
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Simple health check endpoint
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Get products with pagination and search
+      description: Retrieve paginated list of products with optional search query
+      parameters:
+        - name: page
+          in: query
+          description: Page number (default 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Items per page (max 100, default 10)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: q
+          in: query
+          description: Search query (case-insensitive, searches product name)
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+                  meta:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 10
+                      total:
+                        type: integer
+                        example: 25
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Create new order
+      description: Create order with atomic stock deduction and validation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customer_name
+                - items
+              properties:
+                customer_name:
+                  type: string
+                  minLength: 2
+                  example: "John Doe"
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - product_id
+                      - qty
+                    properties:
+                      product_id:
+                        type: integer
+                        minimum: 1
+                        example: 1
+                      qty:
+                        type: integer
+                        minimum: 1
+                        example: 2
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 42
+                  total:
+                    type: integer
+                    description: Total order amount in IDR
+                    example: 300000
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: "PRODUCT_NOT_FOUND"
+                  message: "Product 5 tidak ditemukan"
+        "409":
+          description: Conflict - insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: "OUT_OF_STOCK"
+                  message: "Stock tidak cukup untuk product 2"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order details
+      description: Retrieve order with items and product details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order ID
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: "ORDER_NOT_FOUND"
+                  message: "Order tidak ditemukan"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Keyboard"
+        price:
+          type: integer
+          description: Price in IDR
+          example: 150000
+        stock:
+          type: integer
+          example: 5
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-02-10T10:30:00Z"
+
+    OrderDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        customer_name:
+          type: string
+          example: "John Doe"
+        total:
+          type: integer
+          description: Total amount in IDR
+          example: 300000
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-02-10T15:45:00Z"
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id:
+                type: integer
+                example: 1
+              product_name:
+                type: string
+                example: "Keyboard"
+              qty:
+                type: integer
+                example: 2
+              price_snapshot:
+                type: integer
+                description: Price at time of order (IDR)
+                example: 150000
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "INVALID_QUERY"
+            message:
+              type: string
+              example: "Query tidak valid"
+            details:
+              type: object
+              description: Additional error details (optional)
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: "INVALID_QUERY"
+              message: "Query tidak valid"
+              details: {}
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "Terjadi kesalahan internal"

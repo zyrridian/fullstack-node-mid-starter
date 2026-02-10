@@ -39,14 +39,14 @@ export function ordersRouter({ db }) {
         for (const item of items) {
           // Get product details
           const product = await db.get(
-            "SELECT id, price, stock FROM products WHERE id = ?",
+            "SELECT id, name, price, stock FROM products WHERE id = ?",
             [item.product_id],
           );
 
           if (!product) {
             throw notFound(
               "PRODUCT_NOT_FOUND",
-              `Product ${item.product_id} tidak ditemukan`,
+              `Product dengan ID ${item.product_id} tidak ditemukan`,
             );
           }
 
@@ -59,7 +59,7 @@ export function ordersRouter({ db }) {
           if (result.changes === 0) {
             throw conflict(
               "OUT_OF_STOCK",
-              `Stock tidak cukup untuk product ${item.product_id}`,
+              `Stock tidak cukup untuk ${product.name}. Diminta: ${item.qty}, Tersedia: ${product.stock}`,
             );
           }
 
