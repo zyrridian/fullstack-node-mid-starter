@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
-    "test": "cross-env NODE_ENV=test jest --runInBand"
+    "test": "cross-env NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --runInBand"
   },
   "dependencies": {
     "cors": "^2.8.5",
